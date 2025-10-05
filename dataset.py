@@ -36,6 +36,37 @@ def create_dataloader_v1(text, batch_size=4, max_length=256, stride=128, shuffle
     )
 
 
+def embed(inputs, vocal_size=50257, output_dim=256):
+    '''
+    Args:
+        inputs: 经过tokenizer后的tensor,大小应该是: [batch_size, context_length]
+        context_length: 组成单个上下文的语境长度
+        vocal_size: 词典的token数量
+        output_dim: 嵌入向量的维度
+    Return:
+        返回嵌入向量，大小是[batch_size, context_length, output_dim]
+    '''
+    context_length = inputs.shape[-1]
+
+    # token嵌入：token_id-> 1*n tensor的映射，层大小为[vocab_size, output_dim]
+    # 本质上是将每一个tensor的token转化为{token, output_dim}的二元组，扩大了一维
+    token_embedding_layer = torch.nn.Embedding(vocab_size, output_dim) 
+    token_embedded = token_embedding_layer(inputs)  # 这里的token嵌入应该只利用索引，非矩阵操作，返回的是[batch_size, context_length, output_dim]
+
+    # 绝对位置嵌入：其实是给长度为context_length的每个位置都给一个值，层大小为[context_length, output_dim]
+    # 即每一个位置都对应一个output_dim的一维向量
+    pos_embedding_layer = torch.nn.Embedding(context_length, output_dim)  # 大小为[context_length, output_dim]
+    pos_embedded = pos_embedding_layer(torch.arange(context_length))
+
+    return token_embedded + pos_embedded
+
+
+def read_file_as_text(filename):
+    with open("the-verdict.txt", "r", encoding='utf-8') as f:
+        raw_text = f.read()    
+    return raw_text
+
+
 class SimpleTokenizer:
     def __init__(self, vocab: dict):
         '''
@@ -89,15 +120,15 @@ if __name__ == '__main__':
     data_iter = iter(dataloader)
     inputs, targets = next(data_iter)
 
-
     # 嵌入层，绝对位置嵌入
     vocab_size = 50257
     output_dim = 256
     torch.manual_seed(123)
-    token_embedding_layer = torch.nn.Embedding(vocab_size, output_dim)  # 嵌入层是token_id-> 1*n tensor的映射，由随机值组成
-    pos_embedding_layer = torch.nn.Embedding(context_length, output_dim)
-    token_embedded = token_embedding_layer(inputs)  # token_embedded:[8, 4, 256]
-    pos_embedded = pos_embedding_layer(torch.arange(context_length)) # [4, 256]
-    input_embedded = token_embedded + pos_embedded  # [8, 4, 256]
-
-
+    
+    # token_embedding_layer = torch.nn.Embedding(vocab_size, output_dim)  # 嵌入层是token_id-> 1*n tensor的映射，由随机值组成
+    # pos_embedding_layer = torch.nn.Embedding(context_length, output_dim)
+    # token_embedded = token_embedding_layer(inputs)  # token_embedded:[8, 4, 256]
+    # pos_embedded = pos_embedding_layer(torch.arange(context_length)) # [4, 256]
+    # input_embedded = token_embedded + pos_embedded  # [8, 4, 256]
+    # print(input_embedded.shape)
+    print(embed(inputs=inputs, vocal_size=vocab_size, output_dim=output_dim).shape)
